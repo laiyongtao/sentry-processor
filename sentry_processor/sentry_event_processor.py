@@ -2,6 +2,7 @@
 from .raven_codes import SanitizeKeysProcessor, text_type
 from enum import IntEnum, unique
 
+
 @unique
 class POSITION(IntEnum):
     LEFT = 1
@@ -19,12 +20,11 @@ class DesensitizationProcessor(SanitizeKeysProcessor):
         "token",
     }
 
-    SYMBOL = "*"
-    MASK = SYMBOL * 8
-    PARTIAL_MASK = SYMBOL * 4
+    MASK = "*" * 8
+    PARTIAL_MASK = "*" * 4
 
     def __init__(self, sensitive_keys=None, mask=None, with_default_keys=True,
-                 partial_keys=None, partial_mask=None, mask_postions=POSITION.RIGHT, off_set=0):
+                 partial_keys=None, partial_mask=None, mask_position=POSITION.RIGHT, off_set=0):
         if not sensitive_keys:
             sensitive_keys = set()
         if not partial_keys:
@@ -35,21 +35,37 @@ class DesensitizationProcessor(SanitizeKeysProcessor):
             self.MASK = mask
         if partial_mask is not None:
             self.PARTIAL_MASK = partial_mask
-
+        self.PARTIAL_MASK = text_type(self.PARTIAL_MASK)
         self._part_len = len(self.PARTIAL_MASK)
 
         for p in POSITION:
-            if mask_postions == p: break
+            if mask_position == p: break
         else:
             raise ValueError("The value of mask_postions must be one of the options of POSITION")
+
+        self.mask_position = mask_position
+
+        self.off_set = abs(int(off_set))
 
     @property
     def sanitize_keys(self):
         return self._sensitive_keys
 
     def partly_mask(self, value):
-        # TODO:
-        return value
+        value_len = len(value)
+        if value_len <= self._part_len:
+            return self.PARTIAL_MASK
+
+        off_set = self.off_set if value_len >= (self._part_len + self.off_set) else (value_len - self._part_len)
+
+        if self.mask_position == POSITION.LEFT:
+            lp = value[:off_set]
+            rp = value[off_set + self._part_len:]
+        else:
+            rp = value[-off_set:] if off_set != 0 else ""
+            lp = value[:-(off_set + self._part_len)]
+
+        return lp + self.PARTIAL_MASK + rp
 
     def sanitize(self, item, value):
         if value is None:
@@ -73,21 +89,23 @@ class DesensitizationProcessor(SanitizeKeysProcessor):
 
         return value
 
-    def __call__(self, data, hint):
-
-        if 'exception' in data:
-            if 'values' in data['exception']:
-                for value in data['exception'].get('values', []):
+    def process(self, event, hint):
+        if 'exception' in event:
+            if 'values' in event['exception']:
+                for value in event['exception'].get('values', []):
                     if 'stacktrace' in value:
                         self.filter_stacktrace(value['stacktrace'])
 
-        if 'request' in data:
-            self.filter_http(data['request'])
+        if 'request' in event:
+            self.filter_http(event['request'])
 
-        if 'extra' in data:
-            data['extra'] = self.filter_extra(data['extra'])
+        if 'extra' in event:
+            event['extra'] = self.filter_extra(event['extra'])
 
-        return data
+        return event
+
+    def __call__(self, event, hint):
+        return self.process(event, hint)
 
 
 if __name__ == '__main__':
