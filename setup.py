@@ -23,6 +23,6 @@ setup(
     classifiers=[
         "Programming Language :: Python",
     ],
-    keywords = ("sentry", "processor", "sensitive", "filter"),
+    keywords = ["sentry", "processor", "sensitive", "filter"],
     packages=find_packages(exclude=["demos"]),
 )

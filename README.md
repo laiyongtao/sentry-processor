@@ -1,6 +1,9 @@
 # sentry-processor
 sentry event processor for protecting sensitive infos. 
-
+### install
+```shell
+pip install sentry-processor
+```
 #### Demo:
 ```python
 import sentry_sdk
